@@ -2,9 +2,10 @@ torch
 torchvision
 numpy
 pandas
+scipy
 matplotlib
-pillow
 scikit-learn
 SimpleITK
 grad-cam
 gradio
+pytest

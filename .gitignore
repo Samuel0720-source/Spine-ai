@@ -1,6 +1,7 @@
 .venv/
 data/
-models/*.pt
-outputs/
+runs/
+app_assets/model.pt
 __pycache__/
+.pytest_cache/
 .DS_Store
