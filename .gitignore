@@ -1,7 +1,6 @@
+__pycache__/
 .venv/
 data/
 runs/
-app_assets/model.pt
-__pycache__/
-.pytest_cache/
-.DS_Store
+reports/
+app_assets/

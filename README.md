@@ -6,49 +6,40 @@
 > does not diagnose the cause of a patient's symptoms, and is not a medical device.
 > "No herniation finding" does not mean "normal spine".
 
-Demo: [링크 입력] · Video: [링크 입력]
+**Status: work in progress.** The data pipeline is being built first; training and evaluation come next, and the results table will be filled only after a single, final test-set run.
+
+| Step | State |
+|---|---|
+| Project config: paths, labels, crop size, split and training settings (`src/config.py`) | done |
+| MRI loading, geometry checks, mask-to-image alignment, common orientation, NumPy conversion (`src/preprocess.py`) | done |
+| Representative slice, 80 mm physical crop, intensity normalisation | next |
+| Patient-level split, ResNet18 training (single vs. three adjacent slices) | planned |
+| One final test run with bootstrap confidence intervals, Grad-CAM error review, demo | planned |
 
 ## Data
-- SPIDER (van der Graaf et al., *Sci Data* 2024), https://zenodo.org/records/10159290, CC BY 4.0
-- Used: T2 sagittal series only. Included after checks: **[N] patients, [N] discs ([N] positive / [N] negative)**
-  (from `prep_summary.json`). Excluded: [N] discs — reasons in `exclusions.csv`.
-- Evaluation unit: disc. Split unit: patient (train/val/test = [N]/[N]/[N] patients, `split_summary.csv`).
+- SPIDER (van der Graaf et al., *Sci Data* 2024), https://zenodo.org/records/10159290, CC BY 4.0. Not included in this repository; place it under `data/raw` (or set `SPINE_DATA_DIR`).
+- Plan: T2 sagittal series only; evaluation unit = disc; split unit = patient, so no patient appears in both training and test.
 
-## Method
-1. Reorient every series to a common anatomical orientation (SimpleITK `DICOMOrient`, PIL).
-2. Representative slice = sagittal slice with the largest disc-mask area (a fixed rule, not "the slice where herniation is most visible").
-3. Physical crop: [80] mm square centred on the disc centroid → 224×224 (aspect ratio preserved, out-of-image padded with 0).
-4. Percentile (1–99) intensity normalisation from the representative slice, applied identically in training, evaluation and the demo.
-5. ImageNet-pretrained ResNet18, class-weighted cross-entropy, model selection by validation average precision.
-6. Threshold chosen on validation (Youden's J), then applied unchanged to the test set.
+## Method (planned)
+1. Reorient every series to one anatomical orientation (`DICOMOrient` to PIL) so array axes always mean the same direction. *(done)*
+2. Resample a mask onto its image grid with nearest-neighbour when their geometry differs, so label values never blend. *(done)*
+3. Representative slice = sagittal slice with the largest disc-mask area (a fixed rule, not "the slice where herniation looks clearest").
+4. Physical crop: 80 mm square centred on the disc → 224×224, aspect ratio kept, outside padded with 0.
+5. 1st–99th percentile intensity normalisation, identical in training, evaluation and demo.
+6. ImageNet-pretrained ResNet18, class-weighted cross-entropy, model selection by validation average precision; threshold chosen on validation and applied unchanged to test.
 
-## Results (test set, evaluated once on [날짜])
-| Model | ROC-AUC (95% CI) | Average precision (95% CI) | Sensitivity | Specificity | Precision |
-|---|---|---|---|---|---|
-| Majority class | [ ] | [ ] | [ ] | [ ] | [ ] |
-| Single slice | [ ] | [ ] | [ ] | [ ] | [ ] |
-| Three adjacent slices | [ ] | [ ] | [ ] | [ ] | [ ] |
+## Why it is built this way
+- Splitting by **patient**, not by disc, prevents the same person's other discs leaking into the test set.
+- The test set is evaluated **once**; choosing anything on it would make the reported numbers optimistic.
+- Cropping in **millimetres** rather than pixels keeps the anatomy the same size across scanners with different resolutions.
 
-CIs: patient-level bootstrap (2,000 resamples). Seed variation (3 seeds): [ ]. Paired difference three − single: [ ].
+## Limitations (known in advance)
+- Four Dutch hospitals; sagittal only (no axial); few positive discs, so confidence intervals will be wide.
+- Uses expert masks to find discs, so it cannot run on a new scan without them.
 
-## Error review
-Grad-CAM (target: herniation class, per-image min-max scaled) was used as a visual check on validation cases
-selected by a fixed rule (TP/TN/FP/FN). Observations: [ ]. Hypotheses (not verified): [ ].
-
-## Limitations
-- Small number of positive discs ([N] in test); wide confidence intervals.
-- Four Dutch hospitals; sagittal only (no axial); vertebra numbering in SPIDER is not anatomical.
-- Uses ground-truth masks at inference.
-
-## Reproduce
+## Run what exists today
 ```bash
 python -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt
-python -m pytest -q
-python src/validate_data.py --n-patients 5
-python src/prepare_data.py && python src/make_split.py
-python src/train.py --mode single --seed 0
-python src/train.py --mode three --seed 0
-python src/final_test.py --runs runs/<single> runs/<three> --confirm-final
-python src/export_examples.py --run runs/<chosen> && python app.py
+cd src && python -c "import preprocess; print('preprocessing module loads')"
 ```
 Tested library versions: `requirements-tested.txt`.
